@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Version 0.0.1 by Matthew Pearson
+# Version 0.0.2 by Matthew Pearson
 
 import sys
 import os
@@ -12,6 +12,8 @@ import threading
 from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QLabel, QLineEdit, QFileDialog
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QTimer
+
+import display.Videoplayer
 
 class MessageDialoge():
 	
@@ -29,7 +31,19 @@ class MessageDialoge():
 		
 		tkinter.Label(self.container,text=str(message)).pack()
 
-class downloader():
+
+class MyLogger(object):
+	def debug(self, msg):
+		pass
+
+	def warning(self, msg):
+		pass
+
+	def error(self, msg):
+		print(msg)
+
+
+class downloader(MyLogger):
 	
 	def download(self,videolink,videoquality,downloadpath):
 
@@ -37,12 +51,16 @@ class downloader():
 
 		ydl_opts = {
 			'format':videoquality,
+			'forcedid':1,
+			'logger': self
 		}
 
 		with youtube_dl.YoutubeDL(ydl_opts) as ydl:
 				thread1 = threading.Thread(target=ydl.download([videolink]))
 				thread1.start()
 				
+	def __init__(self):
+		MyLogger.__init__(self)
 		
 class qt_main_screen(QWidget,downloader,MessageDialoge):
 	
@@ -55,6 +73,8 @@ class qt_main_screen(QWidget,downloader,MessageDialoge):
 		self.top = 10
 		self.width = 410
 		self.height = 160
+
+		self.youtubeBaseUrl = "https://www.youtube.com/watch?v="
 		
 		self.initUI()
 		
@@ -87,70 +107,78 @@ class qt_main_screen(QWidget,downloader,MessageDialoge):
 		
 		try:
 			print("Downloading")
-			self.download(self.link_text_box.text(),self.quality_text_box.text(),self.downloaddir)
+			self.download(self.youtubeBaseUrl + self.link_text_box.text(),self.quality_text_box.text(),self.downloaddir)
+			print(self.downloaddir + "*" + self.link_text_box.text() + "*")
+			self.playVideo(self.downloaddir + "/*" + self.link_text_box.text() + "*.mp4")
 
 		except Exception as e:
 			print(e)
 
-	def getFileDir(self):
+	def playVideo(self,path):
+		os.system("mpv " + path)
+		#self.player = display.Videoplayer.App() // Work on using the video player I just made
+		#self.player.resize(640, 480)
+		#self.player.playFile(path)
+		#self.player.show()
 
+	def getFileDir(self):
 		self.downloaddir = QFileDialog.getExistingDirectory(None, 'Select a folder:', '', QFileDialog.ShowDirsOnly)
 		
 
-class main_screen(tkinter.Tk,downloader,MessageDialoge): # I don't really know if this is a good way of using inheritance but I wanted to try it out since I just learned about it.
+# class main_screen(tkinter.Tk,downloader,MessageDialoge): # I don't really know if this is a good way of using inheritance but I wanted to try it out since I just learned about it.
 	
-	menu = ""
+# 	menu = ""
 	
-	linkEntry = ""
-	qualityEntry = ""
-	downloaddir = ""
-	browsebutton  = ""
-	downloadbutton = ""
+# 	linkEntry = ""
+# 	qualityEntry = ""
+# 	downloaddir = ""
+# 	browsebutton  = ""
+# 	downloadbutton = ""
 	
-	def getFileDir(self):
+# 	def getFileDir(self):
 		
-		self.downloaddir = filedialog.askdirectory()
+# 		self.downloaddir = filedialog.askdirectory()
 		
-		print(self.downloaddir)
+# 		print(self.downloaddir)
 		
-	def downloadvideo(self):
+# 	def downloadvideo(self):
 		
-		try:
-			self.download(self.linkEntry.get(),self.qualityEntry.get(),self.downloaddir)
-			self.displayMessage("Download Completed\n " + self.downloaddir)
-		except Exception as Error:
-			self.displayError(Error)
+# 		try:
+# 			self.download(self.linkEntry.get(),self.qualityEntry.get(),self.downloaddir)
+# 			self.displayMessage("Download Completed\n " + self.downloaddir)
+# 		except Exception as Error:
+# 			self.displayError(Error)
 			
-	def __init__(self):
-		tkinter.Tk.__init__(self)
-		downloader.__init__(self)
-		MessageDialoge.__init__(self)
+# 	def __init__(self):
+# 		tkinter.Tk.__init__(self)
+# 		downloader.__init__(self)
+# 		MessageDialoge.__init__(self)
 		
-		self.menu = tkinter.Menu()
+# 		self.menu = tkinter.Menu()
 
-		#self.geometry("640x580")
-		self.config(menu=self.menu)
+# 		#self.geometry("640x580")
+# 		self.config(menu=self.menu)
 		
-		firstmenu = tkinter.Menu(self.menu)
-		firstmenu.add_command(label="Quit",command=quit)
+# 		firstmenu = tkinter.Menu(self.menu)
+# 		firstmenu.add_command(label="Quit",command=quit)
 		
-		self.menu.add_cascade(label="file",menu=firstmenu)
+# 		self.menu.add_cascade(label="file",menu=firstmenu)
 		
-		tkinter.Label(self,text="Link:").grid(column=0)
-		self.linkEntry = tkinter.Entry(self)
-		self.linkEntry.grid(row=0,column=1)
+# 		tkinter.Label(self,text="Link:").grid(column=0)
+# 		self.linkEntry = tkinter.Entry(self)
+# 		self.linkEntry.grid(row=0,column=1)
 		
-		tkinter.Label(self,text="Quality:").grid(row=1,column=0)
-		self.qualityEntry = tkinter.Entry(self)
-		self.qualityEntry.grid(row=1,column=1)
+# 		tkinter.Label(self,text="Quality:").grid(row=1,column=0)
+# 		self.qualityEntry = tkinter.Entry(self)
+# 		self.qualityEntry.grid(row=1,column=1)
 		
-		self.browsebutton = tkinter.Button(self,text="Browse",command=self.getFileDir)
-		self.browsebutton.grid(row=2,column=1)
+# 		self.browsebutton = tkinter.Button(self,text="Browse",command=self.getFileDir)
+# 		self.browsebutton.grid(row=2,column=1)
 		
-		self.downloadbutton = tkinter.Button(self,text="Download",command=self.downloadvideo)
-		self.downloadbutton.grid(row=0,column=2)
+# 		self.downloadbutton = tkinter.Button(self,text="Download",command=self.downloadvideo)
+# 		self.downloadbutton.grid(row=0,column=2)
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    screen = qt_main_screen()
-    sys.exit(app.exec_())
+	app = QApplication(sys.argv)
+	screen = qt_main_screen()
+	sys.exit(app.exec_())
