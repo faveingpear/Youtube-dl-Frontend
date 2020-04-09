@@ -4,8 +4,8 @@
 
 import sys
 import os
-import tkinter
-from tkinter import filedialog
+#import tkinter
+#from tkinter import filedialog
 import youtube_dl
 import threading
 
