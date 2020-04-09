@@ -9,41 +9,125 @@ from tkinter import filedialog
 import youtube_dl
 import threading
 
-from PyQt5.QtWidgets import QWidget, QPushButton, QApplication, QLabel, QLineEdit, QFileDialog
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import QDir, Qt, QUrl
+from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
+from PyQt5.QtMultimediaWidgets import QVideoWidget
+from PyQt5.QtWidgets import (QApplication, QLineEdit,QFileDialog, QHBoxLayout, QLabel,QPushButton, QSizePolicy, QSlider, QStyle, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import QMainWindow,QWidget, QPushButton, QAction
+from PyQt5.QtGui import QIcon
 
-import display.Videoplayer
+#import display.Videoplayer
 
-class MessageDialoge():
+class Videoplayer(QMainWindow):
 	
-	container = ""
-	
-	def displayError(self,error):
+	def __init__(self , parent = None):
+		super(Videoplayer,self).__init__(parent)
 		
-		self.container = tkinter.Tk()
-	
-		tkinter.Label(self.container,text=str(error)).pack()
-
-	def displayMessage(self,message):
+		self.setWindowTitle("VideoPlayer")
 		
-		self.container = tkinter.Tk()
+		self.mediaPlayer = QMediaPlayer(None, QMediaPlayer.VideoSurface)
 		
-		tkinter.Label(self.container,text=str(message)).pack()
+		videoWidget = QVideoWidget()
+		
+		self.playButton = QPushButton()
+		self.playButton.setEnabled(False)
+		self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+		self.playButton.clicked.connect(self.play)
 
+		self.positionSlider = QSlider(Qt.Horizontal)
+		self.positionSlider.setRange(0, 0)
+		self.positionSlider.sliderMoved.connect(self.setPosition)
 
-class MyLogger(object):
-	def debug(self, msg):
-		pass
+		self.errorLabel = QLabel()
+		self.errorLabel.setSizePolicy(QSizePolicy.Preferred,
+			QSizePolicy.Maximum)
 
-	def warning(self, msg):
-		pass
+		# Create new action
+		openAction = QAction(QIcon('open.png'), '&Open', self)        
+		openAction.setShortcut('Ctrl+O')
+		openAction.setStatusTip('Open movie')
+		openAction.triggered.connect(self.openFile)
 
-	def error(self, msg):
-		print(msg)
+		# Create exit action
+		exitAction = QAction(QIcon('exit.png'), '&Exit', self)        
+		exitAction.setShortcut('Ctrl+Q')
+		exitAction.setStatusTip('Exit application')
+		exitAction.triggered.connect(self.exitCall)
 
+		# Create menu bar and add action
+		menuBar = self.menuBar()
+		fileMenu = menuBar.addMenu('&File')
+		#fileMenu.addAction(newAction)
+		fileMenu.addAction(openAction)
+		fileMenu.addAction(exitAction)
 
-class downloader(MyLogger):
+		# Create a widget for window contents
+		wid = QWidget(self)
+		self.setCentralWidget(wid)
+
+		# Create layouts to place inside widget
+		controlLayout = QHBoxLayout()
+		controlLayout.setContentsMargins(0, 0, 0, 0)
+		controlLayout.addWidget(self.playButton)
+		controlLayout.addWidget(self.positionSlider)
+
+		layout = QVBoxLayout()
+		layout.addWidget(videoWidget)
+		layout.addLayout(controlLayout)
+		layout.addWidget(self.errorLabel)
+
+		# Set widget to contain window contents
+		wid.setLayout(layout)
+
+		self.mediaPlayer.setVideoOutput(videoWidget)
+		self.mediaPlayer.stateChanged.connect(self.mediaStateChanged)
+		self.mediaPlayer.positionChanged.connect(self.positionChanged)
+		self.mediaPlayer.durationChanged.connect(self.durationChanged)
+		self.mediaPlayer.error.connect(self.handleError)
+
+	def openFile(self):
+		fileName, _ = QFileDialog.getOpenFileName(self, "Open Movie",
+			QDir.homePath())
+
+		if fileName != '':
+			self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(fileName)))
+			self.playButton.setEnabled(True)
+
+	def playFile(self,filepath):
+		self.mediaPlayer.setMedia(QMediaContent(QUrl.fromLocalFile(filepath)))
+		self.playButton.setEnabled(True)
+
+	def exitCall(self):
+		sys.exit(app.exec_())
+
+	def play(self):
+		if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
+			self.mediaPlayer.pause()
+		else:
+			self.mediaPlayer.play()
+
+	def mediaStateChanged(self, state):
+		if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
+			self.playButton.setIcon(
+					self.style().standardIcon(QStyle.SP_MediaPause))
+		else:
+			self.playButton.setIcon(
+					self.style().standardIcon(QStyle.SP_MediaPlay))
+
+	def positionChanged(self, position):
+		self.positionSlider.setValue(position)
+
+	def durationChanged(self, duration):
+		self.positionSlider.setRange(0, duration)
+
+	def setPosition(self, position):
+		self.mediaPlayer.setPosition(position)
+
+	def handleError(self):
+		self.playButton.setEnabled(False)
+		self.errorLabel.setText("Error: " + self.mediaPlayer.errorString())
+
+class downloader():
 	
 	def download(self,videolink,videoquality,downloadpath):
 
@@ -51,18 +135,14 @@ class downloader(MyLogger):
 
 		ydl_opts = {
 			'format':videoquality,
-			'forcedid':1,
-			'logger': self
+			'outtmpl':"%(id)s.%(ext)s"
 		}
 
 		with youtube_dl.YoutubeDL(ydl_opts) as ydl:
 				thread1 = threading.Thread(target=ydl.download([videolink]))
 				thread1.start()
-				
-	def __init__(self):
-		MyLogger.__init__(self)
 		
-class qt_main_screen(QWidget,downloader,MessageDialoge):
+class qt_main_screen(QWidget,downloader):
 	
 	def __init__(self):
 		super().__init__()
@@ -108,77 +188,23 @@ class qt_main_screen(QWidget,downloader,MessageDialoge):
 		try:
 			print("Downloading")
 			self.download(self.youtubeBaseUrl + self.link_text_box.text(),self.quality_text_box.text(),self.downloaddir)
-			print(self.downloaddir + "*" + self.link_text_box.text() + "*")
-			self.playVideo(self.downloaddir + "/*" + self.link_text_box.text() + "*.mp4")
+			#print(self.downloaddir + "*" + self.link_text_box.text() + "*")
+			self.playVideo(self.downloaddir + "/" + self.link_text_box.text() + ".mp4")
 
 		except Exception as e:
 			print(e)
 
 	def playVideo(self,path):
-		os.system("mpv " + path)
-		#self.player = display.Videoplayer.App() // Work on using the video player I just made
-		#self.player.resize(640, 480)
-		#self.player.playFile(path)
-		#self.player.show()
+		player.playFile(path)
+		player.show()
 
 	def getFileDir(self):
 		self.downloaddir = QFileDialog.getExistingDirectory(None, 'Select a folder:', '', QFileDialog.ShowDirsOnly)
 		
-
-# class main_screen(tkinter.Tk,downloader,MessageDialoge): # I don't really know if this is a good way of using inheritance but I wanted to try it out since I just learned about it.
-	
-# 	menu = ""
-	
-# 	linkEntry = ""
-# 	qualityEntry = ""
-# 	downloaddir = ""
-# 	browsebutton  = ""
-# 	downloadbutton = ""
-	
-# 	def getFileDir(self):
-		
-# 		self.downloaddir = filedialog.askdirectory()
-		
-# 		print(self.downloaddir)
-		
-# 	def downloadvideo(self):
-		
-# 		try:
-# 			self.download(self.linkEntry.get(),self.qualityEntry.get(),self.downloaddir)
-# 			self.displayMessage("Download Completed\n " + self.downloaddir)
-# 		except Exception as Error:
-# 			self.displayError(Error)
-			
-# 	def __init__(self):
-# 		tkinter.Tk.__init__(self)
-# 		downloader.__init__(self)
-# 		MessageDialoge.__init__(self)
-		
-# 		self.menu = tkinter.Menu()
-
-# 		#self.geometry("640x580")
-# 		self.config(menu=self.menu)
-		
-# 		firstmenu = tkinter.Menu(self.menu)
-# 		firstmenu.add_command(label="Quit",command=quit)
-		
-# 		self.menu.add_cascade(label="file",menu=firstmenu)
-		
-# 		tkinter.Label(self,text="Link:").grid(column=0)
-# 		self.linkEntry = tkinter.Entry(self)
-# 		self.linkEntry.grid(row=0,column=1)
-		
-# 		tkinter.Label(self,text="Quality:").grid(row=1,column=0)
-# 		self.qualityEntry = tkinter.Entry(self)
-# 		self.qualityEntry.grid(row=1,column=1)
-		
-# 		self.browsebutton = tkinter.Button(self,text="Browse",command=self.getFileDir)
-# 		self.browsebutton.grid(row=2,column=1)
-		
-# 		self.downloadbutton = tkinter.Button(self,text="Download",command=self.downloadvideo)
-# 		self.downloadbutton.grid(row=0,column=2)
-
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
+	player = Videoplayer()
+	player.resize(640, 480)
 	screen = qt_main_screen()
+	app2 = QApplication(sys.argv)
 	sys.exit(app.exec_())
